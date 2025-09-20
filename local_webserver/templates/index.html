@@ -329,6 +329,29 @@
             color: #2196F3;
             font-weight: bold;
         }
+        .pathing-option-modal {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border: 1px solid #dee2e6;
+        }
+        .pathing-checkbox-modal {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .pathing-checkbox-modal input[type="checkbox"] {
+            margin-right: 10px;
+            transform: scale(1.2);
+        }
+        .pathing-info-modal {
+            margin-top: 8px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -357,7 +380,7 @@
                 <span id="volume-display">50%</span>
             </div>
             <div class="volume-info">
-                <small>Servo position: <span id="servo-position">65%</span> | Optimized range: 0% → silence, 100% → maximum usable (40-90% servo)</small>
+                <small>Volume range: 0% → silence, 100% → maximum usable (mapped to 20-60% servo on Pico)</small>
             </div>
             <div class="volume-presets" id="volume-presets">
                 <!-- Volume presets will be loaded here -->
@@ -373,6 +396,7 @@
             <button class="btn home" onclick="homeAll()">🏠 Home All</button>
         </div>
         
+        
         <!-- Song Selection Modal -->
         <div id="song-modal" class="modal" style="display: none;">
             <div class="modal-content">
@@ -385,6 +409,20 @@
                         <h3>📀 Preloaded Songs</h3>
                         <div id="song-list" class="song-list">
                             <div class="loading">Loading songs...</div>
+                        </div>
+                    </div>
+                    
+                    <div class="song-section">
+                        <h3>⚙️ Performance Options</h3>
+                        <div class="pathing-option-modal">
+                            <label class="pathing-checkbox-modal">
+                                <input type="checkbox" id="local-pathing-modal" checked>
+                                <span class="checkmark-modal"></span>
+                                Process song pathing locally (faster performance, selected by default)
+                            </label>
+                            <div class="pathing-info-modal">
+                                <small>When enabled, song pathing is calculated on your computer instead of the Pico for better performance.</small>
+                            </div>
                         </div>
                     </div>
                     
@@ -721,15 +759,22 @@
             try {
                 closeSongMenu();
                 
+                // Get the local pathing preference from modal
+                const localPathing = document.getElementById('local-pathing-modal').checked;
+                
                 const response = await fetch('/api/start_performance', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({song: selectedSong})
+                    body: JSON.stringify({
+                        song: selectedSong,
+                        local_pathing: localPathing
+                    })
                 });
                 
                 const data = await response.json();
                 if (data.success) {
-                    alert(`Performance "${selectedSong}" started!`);
+                    const pathingMethod = localPathing ? 'locally processed' : 'Pico processed';
+                    alert(`Performance "${selectedSong}" started! (${pathingMethod})`);
                 } else {
                     alert('Error: ' + data.error);
                 }
@@ -795,16 +840,10 @@
         function setupVolumeSlider() {
             const volumeSlider = document.getElementById('volume-slider');
             const volumeDisplay = document.getElementById('volume-display');
-            const servoPosition = document.getElementById('servo-position');
             
             volumeSlider.addEventListener('input', function() {
                 const volume = parseInt(this.value);
                 volumeDisplay.textContent = volume + '%';
-                
-                // Calculate and display actual servo position
-                const actualServoPercent = calculateServoPosition(volume);
-                servoPosition.textContent = actualServoPercent + '%';
-                
                 updateVolumePresetSelection(volume);
             });
             
@@ -814,15 +853,6 @@
             });
         }
 
-        function calculateServoPosition(userPercent) {
-            // Apply the same mapping as the Pico
-            if (userPercent <= 0) {
-                return 0;
-            }
-            // Map 0-100% user input to 40-90% servo range
-            const servoPercent = 40 + (userPercent * 50 / 100);
-            return Math.round(servoPercent);
-        }
 
         async function loadVolumePresets() {
             try {

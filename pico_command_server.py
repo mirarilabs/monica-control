@@ -160,6 +160,14 @@ class PicoCommandServer:
             uasyncio.create_task(self._run_performance(song_name))
             return {"success": True, "message": f"Performance '{song_name}' started"}
         
+        elif cmd_type == "play_performance_with_pathing":
+            song_name = command.get("song", "showcase")
+            duties_dict = command.get("duties", [])
+            path = command.get("path", [])
+            print(f"Starting Monica performance with pre-processed pathing: {song_name}")
+            uasyncio.create_task(self._run_performance_with_pathing(song_name, duties_dict, path))
+            return {"success": True, "message": f"Performance '{song_name}' started with local pathing"}
+        
         elif cmd_type == "list_songs":
             # Return available songs
             songs = {
@@ -293,6 +301,42 @@ class PicoCommandServer:
             
         except Exception as e:
             print(f"Error during performance '{song_name}': {e}")
+    
+    async def _run_performance_with_pathing(self, song_name, duties_dict, path):
+        """Run Monica performance with pre-processed pathing from local webserver"""
+        try:
+            from monica.duty import Duty
+            from monica.controller import play_song_with_plan
+            
+            print(f"Using pre-processed pathing for: {song_name}")
+            print(f"Received: {len(duties_dict)} duties, {len(path)} positions")
+            
+            # Convert duties_dict back to Duty objects
+            duties = []
+            for duty_data in duties_dict:
+                from monica.duty import Chord
+                chord = None
+                if duty_data.get('chord'):
+                    chord = Chord.from_text(duty_data['chord'])
+                
+                duty = Duty(
+                    duty_data['start_ms'],
+                    duty_data['duration_ms'],
+                    chord,
+                    duty_data.get('skid', 0),
+                    duty_data.get('volume_percent')
+                )
+                duties.append(duty)
+            
+            print(f"Starting performance with local pathing: {len(duties)} duties, {len(path)} positions")
+            await play_song_with_plan(duties, path)
+            print(f"Performance '{song_name}' completed with local pathing")
+            
+        except Exception as e:
+            print(f"Error during performance with local pathing '{song_name}': {e}")
+            # Fall back to regular performance
+            print("Falling back to Pico pathing...")
+            await self._run_performance(song_name)
     
     async def _return_finger_home(self, finger):
         """Return finger to home position after brief delay"""

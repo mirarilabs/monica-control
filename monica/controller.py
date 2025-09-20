@@ -79,11 +79,19 @@ async def play_song_with_plan(duties, path, volume_override=None):
 
 	print("Playing song")
 	song_start_ms = ticks_ms()
+	current_volume = target_volume
+	
 	for i in range(len(duties)):
 		duty = duties[i]
 		next_pos = path[i + 1]
 		next_steps = monica.wagon.calculate_steps(next_pos)
 		device.stepper.set_target(next_steps)
+		
+		# Handle volume change if specified in duty
+		if duty.volume_percent is not None and duty.volume_percent != current_volume:
+			device.pump.go_to(duty.volume_percent)
+			current_volume = duty.volume_percent
+			print(f"Volume changed to {current_volume}%")
 		
 		if duty.chord is None:
 			device.fingers_rig.go_home()

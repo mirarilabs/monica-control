@@ -90,7 +90,7 @@ class StandardServo(EventfulPeripheral):
 		if not 0 <= percent <= 100:
 			raise ValueError("Percentage must be between 0 and 100")
 		
-		# Apply volume rescaling: 0-100% user input maps to 30-70% servo range
+		# Apply volume rescaling: 0-100% user input maps to 20-60% servo range
 		target = self._map_volume_percentage(percent)
 		self.go_to(target)
 	
@@ -98,15 +98,15 @@ class StandardServo(EventfulPeripheral):
 		"""
 		Map user volume percentage to actual servo position
 		- User 0% → Servo 0% (silence)
-		- User 100% → Servo 90% (practical maximum)
-		- Maps 0-100% user input to 40-90% servo range
+		- User 100% → Servo 60% (practical maximum)
+		- Maps 0-100% user input to 20-60% servo range
 		"""
 		if user_percent <= 0:
 			return 0.0  # Silence
 		
-		# Map 0-100% user input to 40-90% servo range
-		# Formula: servo_percent = 40 + (user_percent * 50 / 100)
-		servo_percent = 40 + (user_percent * 50 / 100)
+		# Map 0-100% user input to 20-60% servo range
+		# Formula: servo_percent = 20 + (user_percent * 40 / 100)
+		servo_percent = 20 + (user_percent * 40 / 100)
 		
 		# Convert to 0-1 range for servo
 		return servo_percent / 100.0

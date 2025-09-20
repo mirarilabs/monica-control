@@ -8,9 +8,9 @@ Skid = int
 
 # Duty represents a chord or silence that is to be play, and when, and how
 class Duty:
-	__slots__ = ['start_ms', 'duration_ms', 'chord', 'skid']
+	__slots__ = ['start_ms', 'duration_ms', 'chord', 'skid', 'volume_percent']
 
-	def __init__(self, start_ms: TimeMS, duration_ms: TimeMS, chord: Chord | None, skid: Skid = 0):
+	def __init__(self, start_ms: TimeMS, duration_ms: TimeMS, chord: Chord | None, skid: Skid = 0, volume_percent: int = None):
 		if duration_ms <= 0:
 			raise ValueError(f"Invalid duration: {duration_ms}")
 
@@ -18,6 +18,7 @@ class Duty:
 		self.duration_ms = duration_ms
 		self.chord = chord
 		self.skid = skid
+		self.volume_percent = volume_percent  # None means use current volume, int means set to specific volume
 	
 	@property
 	def end_ms(self) -> TimeMS:
@@ -28,11 +29,12 @@ class Duty:
 		return self.chord is None
 	
 	@classmethod
-	def silence(cls, start_ms: TimeMS, duration_ms: TimeMS) -> 'Duty':
-		return cls(start_ms, duration_ms, None)
+	def silence(cls, start_ms: TimeMS, duration_ms: TimeMS, volume_percent: int = None) -> 'Duty':
+		return cls(start_ms, duration_ms, None, volume_percent=volume_percent)
 	
 	def __str__(self) -> str:
-		return f"Duty(start: {self.start_ms}ms, end: {self.end_ms}ms, duration: {self.duration_ms}ms, chord: {self.chord}, skid: {self.skid} positions)"
+		volume_str = f", volume: {self.volume_percent}%" if self.volume_percent is not None else ""
+		return f"Duty(start: {self.start_ms}ms, end: {self.end_ms}ms, duration: {self.duration_ms}ms, chord: {self.chord}, skid: {self.skid} positions{volume_str})"
 	
 	def __repr__(self) -> str:
 		return self.__str__()

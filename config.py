@@ -19,7 +19,7 @@ events = {
 }
 
 controller = {
-		"volume_percent"		: 50  # Default volume as percentage (0-100% user range, maps to 30-70% servo)
+		"volume_percent"		: 50  # Default volume as percentage (0-100% user range, maps to 20-60% servo)
 }
 
 pump = {

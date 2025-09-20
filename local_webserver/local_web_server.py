@@ -9,6 +9,7 @@ import socket
 import json
 import threading
 import time
+from monica_pathing import song_planner
 
 app = Flask(__name__)
 
@@ -105,12 +106,37 @@ def start_performance():
     """Start Monica performance with selected song"""
     data = request.get_json() or {}
     song_name = data.get('song', 'showcase')
+    local_pathing = data.get('local_pathing', False)
     
-    response = pico_client.send_command({
-        "type": "play_performance",
-        "song": song_name
-    })
-    return jsonify(response)
+    if local_pathing:
+        # Process pathing locally
+        try:
+            print(f"Processing song pathing locally for: {song_name}")
+            duties_dict, path = song_planner.plan_song_by_name(song_name)
+            
+            # Send pre-processed pathing to Pico
+            response = pico_client.send_command({
+                "type": "play_performance_with_pathing",
+                "song": song_name,
+                "duties": duties_dict,
+                "path": path
+            })
+            return jsonify(response)
+        except Exception as e:
+            print(f"Local pathing failed: {e}")
+            # Fall back to Pico pathing
+            response = pico_client.send_command({
+                "type": "play_performance",
+                "song": song_name
+            })
+            return jsonify(response)
+    else:
+        # Use Pico pathing (original method)
+        response = pico_client.send_command({
+            "type": "play_performance",
+            "song": song_name
+        })
+        return jsonify(response)
 
 @app.route('/api/key_down', methods=['POST'])
 def key_down():
@@ -187,17 +213,17 @@ def set_volume():
 
 @app.route('/api/volume_presets')
 def volume_presets():
-    """Get volume presets - rescaled for 40-90% servo range"""
+    """Get volume presets - raw user percentages (mapped to 20-60% servo on Pico)"""
     presets = {
-        "silence": 0,    # Maps to servo 0% (true silence)
-        "whisper": 10,   # Maps to servo 45% (very quiet)
-        "quiet": 20,     # Maps to servo 50% (quiet)
-        "soft": 30,      # Maps to servo 55% (soft)
-        "normal": 50,    # Maps to servo 65% (balanced)
-        "medium": 70,    # Maps to servo 75% (medium)
-        "loud": 85,      # Maps to servo 82.5% (loud)
-        "forte": 95,     # Maps to servo 87.5% (very loud)
-        "maximum": 100   # Maps to servo 90% (practical maximum)
+        "silence": 0,    # Raw user percentage (mapped on Pico)
+        "whisper": 10,   # Raw user percentage (mapped on Pico)
+        "quiet": 20,     # Raw user percentage (mapped on Pico)
+        "soft": 30,      # Raw user percentage (mapped on Pico)
+        "normal": 50,    # Raw user percentage (mapped on Pico)
+        "medium": 70,    # Raw user percentage (mapped on Pico)
+        "loud": 85,      # Raw user percentage (mapped on Pico)
+        "forte": 95,     # Raw user percentage (mapped on Pico)
+        "maximum": 100   # Raw user percentage (mapped on Pico)
     }
     return jsonify({"success": True, "presets": presets})
 
