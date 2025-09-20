@@ -41,6 +41,26 @@ class NetworkManager:
     def is_connected(self):
         """Check if WiFi is connected"""
         return self.connected and self.wlan and self.wlan.isconnected()
+    
+    def disconnect(self):
+        """Disconnect from WiFi and cleanup"""
+        try:
+            if self.wlan and self.wlan.isconnected():
+                print("Disconnecting from WiFi...")
+                self.wlan.disconnect()
+                print("WiFi disconnected")
+            
+            if self.wlan:
+                self.wlan.active(False)
+                print("WiFi interface deactivated")
+            
+            self.connected = False
+            self.ip_address = None
+            
+        except Exception as e:
+            print(f"Error during WiFi disconnect: {e}")
+        
+        print("Network cleanup complete")
 
 # Global network manager instance
 network_manager = NetworkManager()

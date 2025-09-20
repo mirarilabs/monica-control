@@ -21,27 +21,29 @@ class PicoClient:
         self.pico_ip = pico_ip
         self.pico_port = pico_port
     
-    def send_command(self, command, retries=3):
-        """Send command to Pico and get response with retry logic"""
+    def send_command(self, command, retries=2):
+        """Send command to Pico and get response with optimized speed"""
         last_error = None
         
         for attempt in range(retries):
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(10)  # Increased timeout
+                # Optimize socket for low latency
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                sock.settimeout(3)  # Reduced timeout for faster failure detection
                 sock.connect((self.pico_ip, self.pico_port))
                 
                 # Send command
                 command_str = json.dumps(command) + "\n"
                 sock.send(command_str.encode())
                 
-                # Receive response with timeout handling
+                # Receive response with optimized timeout
                 response_data = b""
-                sock.settimeout(5)  # Shorter timeout for reading
+                sock.settimeout(1)  # Much shorter timeout for reading
                 
                 while True:
                     try:
-                        chunk = sock.recv(1024)
+                        chunk = sock.recv(512)  # Smaller chunks for faster processing
                         if not chunk:
                             break
                         response_data += chunk
@@ -72,10 +74,10 @@ class PicoClient:
             except Exception as e:
                 last_error = f"Unexpected error: {e}"
             
-            # Wait before retry (except on last attempt)
+            # Minimal wait before retry (except on last attempt)
             if attempt < retries - 1:
-                time.sleep(1)
-                print(f"Retry {attempt + 1}/{retries} after error: {last_error}")
+                time.sleep(0.1)  # Much shorter retry delay
+                print(f"Quick retry {attempt + 1}/{retries} after error: {last_error}")
         
         return {"error": f"Connection failed after {retries} attempts: {last_error}"}
 
@@ -98,9 +100,35 @@ def start_performance():
     response = pico_client.send_command({"type": "play_performance"})
     return jsonify(response)
 
+@app.route('/api/key_down', methods=['POST'])
+def key_down():
+    """Key pressed down (sustain)"""
+    data = request.get_json()
+    finger = data.get('finger')
+    position = data.get('position')
+    
+    response = pico_client.send_command({
+        "type": "key_down",
+        "finger": finger,
+        "position": position
+    })
+    return jsonify(response)
+
+@app.route('/api/key_up', methods=['POST'])
+def key_up():
+    """Key released"""
+    data = request.get_json()
+    finger = data.get('finger')
+    
+    response = pico_client.send_command({
+        "type": "key_up",
+        "finger": finger
+    })
+    return jsonify(response)
+
 @app.route('/api/press_key', methods=['POST'])
 def press_key():
-    """Press a key"""
+    """Press a key (legacy - quick press/release)"""
     data = request.get_json()
     finger = data.get('finger')
     position = data.get('position')

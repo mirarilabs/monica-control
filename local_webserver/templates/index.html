@@ -151,7 +151,8 @@
         <div class="status-bar">
             <div>
                 <strong>Position:</strong> <span id="position">-</span> |
-                <strong>Volume:</strong> <span id="volume">-</span>
+                <strong>Volume:</strong> <span id="volume">-</span> |
+                <strong>Fingers:</strong> <span id="finger-status">-</span>
             </div>
             <div>
                 <strong>Memory:</strong> <span id="memory">-</span> bytes
@@ -249,7 +250,7 @@
                     changeVolume(-1);
                 } else if (isValidKey(key) && !activeKeys.has(key)) {
                     activeKeys.add(key);
-                    pressKeyByLetter(key);
+                    keyDownByLetter(key);  // Hold key down
                     updateKeyDisplay(key, true);
                 }
             });
@@ -258,6 +259,7 @@
                 const key = e.key.toLowerCase();
                 if (activeKeys.has(key)) {
                     activeKeys.delete(key);
+                    keyUpByLetter(key);  // Release key
                     updateKeyDisplay(key, false);
                 }
             });
@@ -269,15 +271,19 @@
                     e.preventDefault();
                     const finger = parseInt(this.dataset.finger);
                     const position = parseInt(this.dataset.position);
-                    pressKey(finger, position);
+                    keyDown(finger, position);  // Hold key down
                     this.classList.add('active');
                 });
 
                 keyElement.addEventListener('mouseup', function(e) {
+                    const finger = parseInt(this.dataset.finger);
+                    keyUp(finger);  // Release key
                     this.classList.remove('active');
                 });
 
                 keyElement.addEventListener('mouseleave', function(e) {
+                    const finger = parseInt(this.dataset.finger);
+                    keyUp(finger);  // Release key when mouse leaves
                     this.classList.remove('active');
                 });
             });
@@ -285,6 +291,34 @@
 
         function isValidKey(key) {
             return 'asdfjkghwertyui'.includes(key);
+        }
+
+        function keyDownByLetter(key) {
+            const keyMapping = {
+                'a': [0, 0], 's': [0, 1], 'd': [1, 0], 'f': [1, 1],
+                'g': [2, 0], 'h': [2, 1], 'j': [3, 0], 'k': [3, 1],
+                'w': [4, 0], 'e': [4, 1], 'r': [5, 0], 't': [5, 1],
+                'y': [6, 0], 'u': [6, 1], 'i': [6, 1]
+            };
+            
+            if (keyMapping[key]) {
+                const [finger, position] = keyMapping[key];
+                keyDown(finger, position);
+            }
+        }
+
+        function keyUpByLetter(key) {
+            const keyMapping = {
+                'a': [0, 0], 's': [0, 1], 'd': [1, 0], 'f': [1, 1],
+                'g': [2, 0], 'h': [2, 1], 'j': [3, 0], 'k': [3, 1],
+                'w': [4, 0], 'e': [4, 1], 'r': [5, 0], 't': [5, 1],
+                'y': [6, 0], 'u': [6, 1], 'i': [6, 1]
+            };
+            
+            if (keyMapping[key]) {
+                const [finger, position] = keyMapping[key];
+                keyUp(finger);
+            }
         }
 
         function pressKeyByLetter(key) {
@@ -321,6 +355,17 @@
                     document.getElementById('position').textContent = data.position;
                     document.getElementById('volume').textContent = data.volume;
                     document.getElementById('memory').textContent = data.memory.toLocaleString();
+                    
+                    // Update finger status
+                    if (data.fingers) {
+                        const activeCount = data.fingers.active_count || 0;
+                        const allHome = data.fingers.all_home;
+                        const statusText = allHome ? 
+                            '✓ All neutral' : 
+                            `${activeCount} active`;
+                        document.getElementById('finger-status').textContent = statusText;
+                    }
+                    
                     setConnectionStatus(true);
                 } else {
                     setConnectionStatus(false);
@@ -359,18 +404,37 @@
             }
         }
 
+        async function keyDown(finger, position) {
+            // Fire and forget for maximum speed - sustain note
+            fetch('/api/key_down', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({finger: finger, position: position})
+            }).catch(error => {
+                console.error('Key down error:', error);
+            });
+        }
+
+        async function keyUp(finger) {
+            // Fire and forget for maximum speed - release note
+            fetch('/api/key_up', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({finger: finger})
+            }).catch(error => {
+                console.error('Key up error:', error);
+            });
+        }
+
         async function pressKey(finger, position) {
-            try {
-                const response = await fetch('/api/press_key', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({finger: finger, position: position})
-                });
-                const data = await response.json();
-                console.log('Key press result:', data);
-            } catch (error) {
+            // Fire and forget for maximum speed - quick press/release (legacy)
+            fetch('/api/press_key', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({finger: finger, position: position})
+            }).catch(error => {
                 console.error('Key press error:', error);
-            }
+            });
         }
 
         async function moveCart(direction) {

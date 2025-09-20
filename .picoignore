@@ -1,0 +1,27 @@
+# Files and directories to exclude from Pico upload
+
+# Local web server (runs on computer only)
+local_webserver/
+
+# Documentation files
+README*.md
+PROJECT_STRUCTURE.md
+TODO
+
+# Git and editor files
+.git/
+.gitignore
+.vscode/
+__pycache__/
+*.pyc
+
+# Backup and temporary files
+*.bak
+*.tmp
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+
