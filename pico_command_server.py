@@ -156,9 +156,20 @@ class PicoCommandServer:
             }
         
         elif cmd_type == "play_performance":
-            print("Starting Monica performance...")
-            uasyncio.create_task(monica.run())
-            return {"success": True, "message": "Performance started"}
+            song_name = command.get("song", "showcase")  # Default to showcase
+            print(f"Starting Monica performance: {song_name}")
+            uasyncio.create_task(self._run_performance(song_name))
+            return {"success": True, "message": f"Performance '{song_name}' started"}
+        
+        elif cmd_type == "list_songs":
+            # Return available songs
+            songs = {
+                "showcase": "Monica Showcase - Full demonstration with cart movement",
+                "original": "Por lo que yo te quiero - Original Monica song", 
+                "simple": "Simple Song - Basic test song",
+                "range_test": "Range Test - Explores all positions"
+            }
+            return {"success": True, "songs": songs}
         
         elif cmd_type == "key_down":
             finger = command.get("finger")
@@ -251,6 +262,22 @@ class PicoCommandServer:
         
         else:
             return {"error": f"Unknown command type: {cmd_type}"}
+    
+    async def _run_performance(self, song_name):
+        """Run Monica performance with selected song"""
+        try:
+            from monica.planner import plan_song_by_name
+            from monica.controller import play_song_with_plan
+            
+            print(f"Planning performance: {song_name}")
+            duties, path = plan_song_by_name(song_name)
+            
+            print(f"Starting performance: {len(duties)} duties, {len(path)} positions")
+            await play_song_with_plan(duties, path)
+            print(f"Performance '{song_name}' completed")
+            
+        except Exception as e:
+            print(f"Error during performance '{song_name}': {e}")
     
     async def _return_finger_home(self, finger):
         """Return finger to home position after brief delay"""

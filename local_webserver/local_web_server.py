@@ -94,10 +94,22 @@ def get_status():
     response = pico_client.send_command({"type": "status"})
     return jsonify(response)
 
+@app.route('/api/list_songs')
+def list_songs():
+    """Get list of available songs"""
+    response = pico_client.send_command({"type": "list_songs"})
+    return jsonify(response)
+
 @app.route('/api/start_performance', methods=['POST'])
 def start_performance():
-    """Start Monica performance"""
-    response = pico_client.send_command({"type": "play_performance"})
+    """Start Monica performance with selected song"""
+    data = request.get_json() or {}
+    song_name = data.get('song', 'showcase')
+    
+    response = pico_client.send_command({
+        "type": "play_performance",
+        "song": song_name
+    })
     return jsonify(response)
 
 @app.route('/api/key_down', methods=['POST'])

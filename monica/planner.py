@@ -1,16 +1,44 @@
 import monica
-from .songwriter import por_lo_que_yo_te_quiero as song
+from .songwriter import monica_showcase as song
 
 
 def plan_song():
+	"""Plan the default showcase song"""
+	print("=== Monica Showcase Performance ===")
 	s = song()
 	print(f"song length: {len(s)}")
 	print(s)
 	duties, path = monica.keystra.fill_and_explore(s)
 	print(f"duties length: {len(duties)}")
 	print(f"path length: {len(path)}")
-	print(duties)
-	print(path)
+	print("Planned path:", path)
+	return duties, path
+
+def plan_song_by_name(song_name="showcase"):
+	"""Plan a specific song by name"""
+	from .songwriter import monica_showcase, por_lo_que_yo_te_quiero, song1, song6
+	
+	songs = {
+		"showcase": monica_showcase,
+		"original": por_lo_que_yo_te_quiero, 
+		"simple": song1,
+		"range_test": song6
+	}
+	
+	if song_name not in songs:
+		print(f"Unknown song '{song_name}'. Available: {list(songs.keys())}")
+		song_name = "showcase"
+	
+	print(f"=== Planning song: {song_name} ===")
+	song_func = songs[song_name]
+	s = song_func()
+	print(f"Song length: {len(s)} duties")
+	
+	duties, path = monica.keystra.fill_and_explore(s)
+	print(f"Planned: {len(duties)} duties, {len(path)} positions")
+	print(f"Performance time: ~{duties[-1].end_ms/1000:.1f} seconds")
+	print(f"Cart positions used: {sorted(set(path))}")
+	
 	return duties, path
 
 def test_all_keys():

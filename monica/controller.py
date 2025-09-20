@@ -60,6 +60,57 @@ def cancel_song():
 	device.servo_rig._encoder_timer.deinit()
 	print("Hacky: ServoRig _encoder_timer deinitialized from here")
 
+async def play_song_with_plan(duties, path):
+	"""Play a song with pre-planned duties and path"""
+	await home_all()
+	
+	# Set volume
+	device.pump.go_to(volume)
+	print("Waiting for pump to reach volume")
+	await device.pump.wait("ReachedTarget")
+
+	# Go to initial position
+	position = path[0]
+	steps = monica.wagon.calculate_steps(position)
+	device.stepper.set_target(steps)
+	print("Waiting for stepper to reach initial position")
+	await device.stepper.wait("ReachedTarget")
+
+	print("Playing song")
+	song_start_ms = ticks_ms()
+	for i in range(len(duties)):
+		duty = duties[i]
+		next_pos = path[i + 1]
+		next_steps = monica.wagon.calculate_steps(next_pos)
+		device.stepper.set_target(next_steps)
+		
+		if duty.chord is None:
+			device.fingers_rig.go_home()
+		else:
+			fingerings = monica.wagon.calculate_fingerings(duty.chord, position)
+			device.fingers_rig.play(fingerings)
+
+		# wait till duty is over
+		duty_end_ms = ticks_add(song_start_ms, duty.end_ms)
+		wait_ms = ticks_diff(duty_end_ms, ticks_ms())
+		print(f"Waiting for {wait_ms} ms to duty completion")
+		await uasyncio.sleep_ms(wait_ms)
+
+		position = next_pos
+
+	print("Song finished")
+	
+	# Disable encoder monitoring during cleanup to prevent false cancellations
+	device.servo_rig._encoder_timer.deinit()
+	print("Encoder monitoring disabled for cleanup")
+	
+	device.pump.go_to("Silence")
+	device.fingers_rig.go_home()
+	await device.fingers_rig.cautionary_wait()
+	device.stepper.set_target(0)
+	await device.stepper.wait("ReachedTarget")
+	await home_all()
+
 async def run():
 	await home_all()
 	play_song_task = uasyncio.create_task(play_song_coro())

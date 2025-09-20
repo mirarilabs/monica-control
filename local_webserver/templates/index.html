@@ -138,6 +138,108 @@
             color: #666;
             font-size: 14px;
         }
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+        .modal-header {
+            background: #2196F3;
+            color: white;
+            padding: 20px;
+            border-radius: 10px 10px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h2 {
+            margin: 0;
+        }
+        .close {
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .close:hover {
+            opacity: 0.7;
+        }
+        .modal-body {
+            padding: 20px;
+        }
+        .modal-footer {
+            padding: 20px;
+            text-align: right;
+            border-top: 1px solid #eee;
+        }
+        .song-section {
+            margin-bottom: 30px;
+        }
+        .song-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .song-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .song-item {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .song-item:hover {
+            background: #e9ecef;
+            border-color: #2196F3;
+        }
+        .song-item.selected {
+            background: #e3f2fd;
+            border-color: #2196F3;
+        }
+        .song-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .song-description {
+            color: #666;
+            font-size: 14px;
+        }
+        .upload-placeholder {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 5px;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+        }
+        .upload-placeholder ul {
+            text-align: left;
+            max-width: 300px;
+            margin: 10px auto;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+        }
     </style>
 </head>
 <body>
@@ -160,12 +262,46 @@
         </div>
         
         <div class="controls">
-            <button class="btn performance" onclick="startPerformance()">▶️ Start Performance</button>
+            <button class="btn performance" onclick="showSongMenu()">🎵 Select & Play Song</button>
             <button class="btn" onclick="moveCart(-1)">← Left</button>
             <button class="btn" onclick="moveCart(1)">Right →</button>
             <button class="btn" onclick="changeVolume(1)">🔊 Vol+</button>
             <button class="btn" onclick="changeVolume(-1)">🔉 Vol-</button>
             <button class="btn home" onclick="homeAll()">🏠 Home All</button>
+        </div>
+        
+        <!-- Song Selection Modal -->
+        <div id="song-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>🎵 Select Performance Song</h2>
+                    <span class="close" onclick="closeSongMenu()">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="song-section">
+                        <h3>📀 Preloaded Songs</h3>
+                        <div id="song-list" class="song-list">
+                            <div class="loading">Loading songs...</div>
+                        </div>
+                    </div>
+                    
+                    <div class="song-section">
+                        <h3>📁 Upload Custom Song</h3>
+                        <div class="upload-placeholder">
+                            <p>🚧 Upload functionality coming soon!</p>
+                            <p>Future features:</p>
+                            <ul>
+                                <li>Upload custom MIDI files</li>
+                                <li>Create songs with web composer</li>
+                                <li>Import from music notation</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" onclick="closeSongMenu()">Cancel</button>
+                </div>
+            </div>
         </div>
         
         <div class="keyboard">
@@ -390,18 +526,106 @@
             }
         }
 
-        async function startPerformance() {
+        let selectedSong = 'showcase';
+        let availableSongs = {};
+
+        async function showSongMenu() {
+            document.getElementById('song-modal').style.display = 'block';
+            await loadSongs();
+        }
+
+        function closeSongMenu() {
+            document.getElementById('song-modal').style.display = 'none';
+        }
+
+        async function loadSongs() {
             try {
-                const response = await fetch('/api/start_performance', {method: 'POST'});
+                const response = await fetch('/api/list_songs');
+                const data = await response.json();
+                
+                if (data.success && data.songs) {
+                    availableSongs = data.songs;
+                    displaySongs(data.songs);
+                } else {
+                    document.getElementById('song-list').innerHTML = 
+                        '<div class="error">Failed to load songs</div>';
+                }
+            } catch (error) {
+                document.getElementById('song-list').innerHTML = 
+                    '<div class="error">Connection error loading songs</div>';
+            }
+        }
+
+        function displaySongs(songs) {
+            const songList = document.getElementById('song-list');
+            songList.innerHTML = '';
+            
+            for (const [songId, description] of Object.entries(songs)) {
+                const songItem = document.createElement('div');
+                songItem.className = 'song-item';
+                if (songId === selectedSong) {
+                    songItem.classList.add('selected');
+                }
+                
+                songItem.innerHTML = `
+                    <div class="song-name">${songId}</div>
+                    <div class="song-description">${description}</div>
+                `;
+                
+                songItem.onclick = () => selectSong(songId);
+                songList.appendChild(songItem);
+            }
+            
+            // Add start button
+            const startButton = document.createElement('button');
+            startButton.className = 'btn performance';
+            startButton.style.marginTop = '20px';
+            startButton.style.width = '100%';
+            startButton.innerHTML = `▶️ Start "${selectedSong}" Performance`;
+            startButton.onclick = () => startSelectedPerformance();
+            songList.appendChild(startButton);
+        }
+
+        function selectSong(songId) {
+            selectedSong = songId;
+            
+            // Update visual selection
+            document.querySelectorAll('.song-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            event.target.closest('.song-item').classList.add('selected');
+            
+            // Update start button text
+            const startButton = document.querySelector('.song-list .btn');
+            if (startButton) {
+                startButton.innerHTML = `▶️ Start "${selectedSong}" Performance`;
+            }
+        }
+
+        async function startSelectedPerformance() {
+            try {
+                closeSongMenu();
+                
+                const response = await fetch('/api/start_performance', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({song: selectedSong})
+                });
+                
                 const data = await response.json();
                 if (data.success) {
-                    alert('Performance started!');
+                    alert(`Performance "${selectedSong}" started!`);
                 } else {
                     alert('Error: ' + data.error);
                 }
             } catch (error) {
                 alert('Connection error: ' + error.message);
             }
+        }
+
+        async function startPerformance() {
+            // Legacy function - start default performance
+            await startSelectedPerformance();
         }
 
         async function keyDown(finger, position) {
