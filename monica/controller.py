@@ -66,6 +66,11 @@ async def run():
 	device.stepper.register_callback("SensorCancel", cancel_song)
 	await play_song_task #type: ignore
 	print("Song finished")
+	
+	# Disable encoder monitoring during cleanup to prevent false cancellations
+	device.servo_rig._encoder_timer.deinit()
+	print("Encoder monitoring disabled for cleanup")
+	
 	device.pump.go_to("Silence")
 	device.fingers_rig.go_home()
 	await device.fingers_rig.cautionary_wait()
