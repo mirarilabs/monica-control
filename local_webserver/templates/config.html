@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monica Configuration</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .config-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .config-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .btn {
+            padding: 10px 20px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        .btn:hover {
+            background: #1976D2;
+        }
+        .btn.success {
+            background: #4CAF50;
+        }
+        .btn.success:hover {
+            background: #45a049;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .back-link {
+            text-align: center;
+            margin-top: 30px;
+        }
+        .back-link a {
+            color: #2196F3;
+            text-decoration: none;
+        }
+        .info {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚙️ Monica Configuration</h1>
+        
+        <div class="info">
+            <strong>Current Configuration:</strong><br>
+            Pico IP: {{ pico_ip }}:{{ pico_port }}
+        </div>
+        
+        <div class="config-section">
+            <h3>Network Settings</h3>
+            <div class="form-group">
+                <label for="pico-ip">Pico IP Address:</label>
+                <input type="text" id="pico-ip" value="{{ pico_ip }}" placeholder="192.168.1.100">
+            </div>
+            <button class="btn" onclick="updatePicoIP()">Update IP Address</button>
+            <button class="btn success" onclick="testConnection()">Test Connection</button>
+            <div id="connection-status"></div>
+        </div>
+        
+        <div class="config-section">
+            <h3>How to Find Pico IP Address</h3>
+            <p>On your Pico, when you run the command server, it will display:</p>
+            <pre>Command server started at 192.168.1.XXX:8080</pre>
+            <p>Use that IP address in the field above.</p>
+        </div>
+        
+        <div class="config-section">
+            <h3>Setup Instructions</h3>
+            <ol>
+                <li><strong>On the Pico:</strong> Run <code>python main.py</code> and select mode with command server</li>
+                <li><strong>On this computer:</strong> Run <code>python local_web_server.py</code></li>
+                <li><strong>Update IP:</strong> Enter the Pico's IP address above and click "Update"</li>
+                <li><strong>Test:</strong> Click "Test Connection" to verify communication</li>
+                <li><strong>Control:</strong> Go to the <a href="/">main interface</a> to control Monica</li>
+            </ol>
+        </div>
+        
+        <div class="back-link">
+            <a href="/">← Back to Monica Control</a>
+        </div>
+    </div>
+
+    <script>
+        async function updatePicoIP() {
+            const ip = document.getElementById('pico-ip').value.trim();
+            const statusDiv = document.getElementById('connection-status');
+            
+            if (!ip) {
+                showStatus('Please enter an IP address', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/set_pico_address', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ip: ip})
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showStatus(data.message, 'success');
+                } else {
+                    showStatus(data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Error updating IP: ' + error.message, 'error');
+            }
+        }
+        
+        async function testConnection() {
+            showStatus('Testing connection...', 'info');
+            
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                if (data.success) {
+                    showStatus(`✓ Connection successful! Position: ${data.position}, Volume: ${data.volume}, Memory: ${data.memory} bytes`, 'success');
+                } else {
+                    showStatus('✗ Connection failed: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('✗ Connection failed: ' + error.message, 'error');
+            }
+        }
+        
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('connection-status');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + type;
+        }
+    </script>
+</body>
+</html>

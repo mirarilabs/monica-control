@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monica Robotic Harmonica Control</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .status-bar {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .keyboard {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 30px 0;
+        }
+        .key-row {
+            display: flex;
+            margin: 5px 0;
+            gap: 5px;
+        }
+        .key {
+            width: 50px;
+            height: 50px;
+            background: white;
+            border: 2px solid #333;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            transition: all 0.1s;
+            user-select: none;
+        }
+        .key:hover {
+            background: #e0e0e0;
+        }
+        .key.active {
+            background: #4CAF50;
+            color: white;
+            transform: scale(0.95);
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 12px 24px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #1976D2;
+        }
+        .btn.performance {
+            background: #4CAF50;
+        }
+        .btn.performance:hover {
+            background: #45a049;
+        }
+        .btn.home {
+            background: #ff9800;
+        }
+        .btn.home:hover {
+            background: #f57c00;
+        }
+        .info-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .info-box {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .info-box h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .key-mapping {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .connection-status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 Monica Robotic Harmonica Control</h1>
+        
+        <div id="connection-status" class="connection-status disconnected">
+            Connecting to Monica...
+        </div>
+        
+        <div class="status-bar">
+            <div>
+                <strong>Position:</strong> <span id="position">-</span> |
+                <strong>Volume:</strong> <span id="volume">-</span>
+            </div>
+            <div>
+                <strong>Memory:</strong> <span id="memory">-</span> bytes
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button class="btn performance" onclick="startPerformance()">▶️ Start Performance</button>
+            <button class="btn" onclick="moveCart(-1)">← Left</button>
+            <button class="btn" onclick="moveCart(1)">Right →</button>
+            <button class="btn" onclick="changeVolume(1)">🔊 Vol+</button>
+            <button class="btn" onclick="changeVolume(-1)">🔉 Vol-</button>
+            <button class="btn home" onclick="homeAll()">🏠 Home All</button>
+        </div>
+        
+        <div class="keyboard">
+            <div class="key-row">
+                <div class="key" data-finger="4" data-position="0">W</div>
+                <div class="key" data-finger="4" data-position="1">E</div>
+                <div class="key" data-finger="5" data-position="0">R</div>
+                <div class="key" data-finger="5" data-position="1">T</div>
+                <div class="key" data-finger="6" data-position="0">Y</div>
+                <div class="key" data-finger="6" data-position="1">U</div>
+                <div class="key" data-finger="6" data-position="1">I</div>
+            </div>
+            <div class="key-row">
+                <div class="key" data-finger="0" data-position="0">A</div>
+                <div class="key" data-finger="0" data-position="1">S</div>
+                <div class="key" data-finger="1" data-position="0">D</div>
+                <div class="key" data-finger="1" data-position="1">F</div>
+                <div class="key" data-finger="2" data-position="0">G</div>
+                <div class="key" data-finger="2" data-position="1">H</div>
+                <div class="key" data-finger="3" data-position="0">J</div>
+                <div class="key" data-finger="3" data-position="1">K</div>
+            </div>
+        </div>
+        
+        <div class="info-panel">
+            <div class="info-box">
+                <h3>Keyboard Controls</h3>
+                <div class="key-mapping">
+                    <strong>Keys:</strong> Click keys above or use keyboard<br>
+                    <strong>Movement:</strong> Arrow keys ← → (or buttons)<br>
+                    <strong>Volume:</strong> Arrow keys ↑ ↓ (or buttons)<br>
+                    <strong>Home:</strong> Space bar (or button)<br>
+                </div>
+            </div>
+            <div class="info-box">
+                <h3>Key Mapping</h3>
+                <div class="key-mapping">
+                    <strong>Upper Row:</strong> W E R T Y U I<br>
+                    <strong>Lower Row:</strong> A S D F G H J K<br>
+                    Each key controls a specific finger position<br>
+                    Left position = blow, Right position = draw
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <a href="/config">⚙️ Configuration</a> | 
+            Network Control System for Monica
+        </div>
+    </div>
+
+    <script>
+        let activeKeys = new Set();
+        let connectionStatus = false;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStatus();
+            setInterval(updateStatus, 2000); // Update every 2 seconds
+            setupKeyboardEvents();
+            setupMouseEvents();
+        });
+
+        function setupKeyboardEvents() {
+            document.addEventListener('keydown', function(e) {
+                const key = e.key.toLowerCase();
+                
+                if (key === ' ') {
+                    e.preventDefault();
+                    homeAll();
+                } else if (key === 'arrowleft') {
+                    e.preventDefault();
+                    moveCart(-1);
+                } else if (key === 'arrowright') {
+                    e.preventDefault();
+                    moveCart(1);
+                } else if (key === 'arrowup') {
+                    e.preventDefault();
+                    changeVolume(1);
+                } else if (key === 'arrowdown') {
+                    e.preventDefault();
+                    changeVolume(-1);
+                } else if (isValidKey(key) && !activeKeys.has(key)) {
+                    activeKeys.add(key);
+                    pressKeyByLetter(key);
+                    updateKeyDisplay(key, true);
+                }
+            });
+
+            document.addEventListener('keyup', function(e) {
+                const key = e.key.toLowerCase();
+                if (activeKeys.has(key)) {
+                    activeKeys.delete(key);
+                    updateKeyDisplay(key, false);
+                }
+            });
+        }
+
+        function setupMouseEvents() {
+            document.querySelectorAll('.key').forEach(keyElement => {
+                keyElement.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    const finger = parseInt(this.dataset.finger);
+                    const position = parseInt(this.dataset.position);
+                    pressKey(finger, position);
+                    this.classList.add('active');
+                });
+
+                keyElement.addEventListener('mouseup', function(e) {
+                    this.classList.remove('active');
+                });
+
+                keyElement.addEventListener('mouseleave', function(e) {
+                    this.classList.remove('active');
+                });
+            });
+        }
+
+        function isValidKey(key) {
+            return 'asdfjkghwertyui'.includes(key);
+        }
+
+        function pressKeyByLetter(key) {
+            const keyMapping = {
+                'a': [0, 0], 's': [0, 1], 'd': [1, 0], 'f': [1, 1],
+                'g': [2, 0], 'h': [2, 1], 'j': [3, 0], 'k': [3, 1],
+                'w': [4, 0], 'e': [4, 1], 'r': [5, 0], 't': [5, 1],
+                'y': [6, 0], 'u': [6, 1], 'i': [6, 1]
+            };
+            
+            if (keyMapping[key]) {
+                const [finger, position] = keyMapping[key];
+                pressKey(finger, position);
+            }
+        }
+
+        function updateKeyDisplay(key, active) {
+            const keyElement = document.querySelector(`[data-key="${key.toUpperCase()}"]`);
+            if (keyElement) {
+                if (active) {
+                    keyElement.classList.add('active');
+                } else {
+                    keyElement.classList.remove('active');
+                }
+            }
+        }
+
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('position').textContent = data.position;
+                    document.getElementById('volume').textContent = data.volume;
+                    document.getElementById('memory').textContent = data.memory.toLocaleString();
+                    setConnectionStatus(true);
+                } else {
+                    setConnectionStatus(false);
+                }
+            } catch (error) {
+                console.error('Status update failed:', error);
+                setConnectionStatus(false);
+            }
+        }
+
+        function setConnectionStatus(connected) {
+            const statusElement = document.getElementById('connection-status');
+            if (connected !== connectionStatus) {
+                connectionStatus = connected;
+                if (connected) {
+                    statusElement.textContent = '✓ Connected to Monica';
+                    statusElement.className = 'connection-status connected';
+                } else {
+                    statusElement.textContent = '✗ Disconnected from Monica';
+                    statusElement.className = 'connection-status disconnected';
+                }
+            }
+        }
+
+        async function startPerformance() {
+            try {
+                const response = await fetch('/api/start_performance', {method: 'POST'});
+                const data = await response.json();
+                if (data.success) {
+                    alert('Performance started!');
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Connection error: ' + error.message);
+            }
+        }
+
+        async function pressKey(finger, position) {
+            try {
+                const response = await fetch('/api/press_key', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({finger: finger, position: position})
+                });
+                const data = await response.json();
+                console.log('Key press result:', data);
+            } catch (error) {
+                console.error('Key press error:', error);
+            }
+        }
+
+        async function moveCart(direction) {
+            try {
+                const response = await fetch('/api/move_cart', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({direction: direction})
+                });
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('position').textContent = data.position;
+                }
+            } catch (error) {
+                console.error('Move error:', error);
+            }
+        }
+
+        async function changeVolume(direction) {
+            try {
+                const response = await fetch('/api/set_volume', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({direction: direction})
+                });
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('volume').textContent = data.volume;
+                }
+            } catch (error) {
+                console.error('Volume error:', error);
+            }
+        }
+
+        async function homeAll() {
+            try {
+                const response = await fetch('/api/home_all', {method: 'POST'});
+                const data = await response.json();
+                if (data.success) {
+                    updateStatus(); // Refresh status after homing
+                }
+            } catch (error) {
+                console.error('Home error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
