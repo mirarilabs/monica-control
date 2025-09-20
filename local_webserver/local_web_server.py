@@ -166,15 +166,40 @@ def move_cart():
 
 @app.route('/api/set_volume', methods=['POST'])
 def set_volume():
-    """Set volume"""
+    """Set volume - supports both direction and direct percentage"""
     data = request.get_json()
     direction = data.get('direction')
+    volume_percent = data.get('volume_percent')
     
-    response = pico_client.send_command({
-        "type": "set_volume",
-        "direction": direction
-    })
+    command = {"type": "set_volume"}
+    
+    if volume_percent is not None:
+        # Direct percentage setting
+        command["volume_percent"] = volume_percent
+    elif direction is not None:
+        # Direction-based adjustment
+        command["direction"] = direction
+    else:
+        return jsonify({"error": "Must provide either 'direction' or 'volume_percent'"})
+    
+    response = pico_client.send_command(command)
     return jsonify(response)
+
+@app.route('/api/volume_presets')
+def volume_presets():
+    """Get volume presets - rescaled for 40-90% servo range"""
+    presets = {
+        "silence": 0,    # Maps to servo 0% (true silence)
+        "whisper": 10,   # Maps to servo 45% (very quiet)
+        "quiet": 20,     # Maps to servo 50% (quiet)
+        "soft": 30,      # Maps to servo 55% (soft)
+        "normal": 50,    # Maps to servo 65% (balanced)
+        "medium": 70,    # Maps to servo 75% (medium)
+        "loud": 85,      # Maps to servo 82.5% (loud)
+        "forte": 95,     # Maps to servo 87.5% (very loud)
+        "maximum": 100   # Maps to servo 90% (practical maximum)
+    }
+    return jsonify({"success": True, "presets": presets})
 
 @app.route('/api/home_all', methods=['POST'])
 def home_all():

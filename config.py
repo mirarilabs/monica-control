@@ -19,7 +19,7 @@ events = {
 }
 
 controller = {
-		"volume"				: "Normal"
+		"volume_percent"		: 50  # Default volume as percentage (0-100% user range, maps to 30-70% servo)
 }
 
 pump = {
@@ -28,7 +28,7 @@ pump = {
 	,	"max_duty"				: 8600
 	,	"max_flight_time"		: 0.33
 	,	"pwm_freq"				: 50
-	,	"named_positions"		: { "Home" : 0, "Silence" : 0, "Low" : 0.4, "Normal" : 0.45, "High" : 0.6 }
+	,	"named_positions"		: { "Home" : 0, "Silence" : 0 }  # Keep only essential named positions
 }
 
 fingers = [

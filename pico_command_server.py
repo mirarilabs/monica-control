@@ -12,8 +12,7 @@ class PicoCommandServer:
         self.server_socket = None
         self.running = False
         self.current_position = 0
-        self.volume_levels = ["Silence", "Low", "Normal", "High"]
-        self.current_volume_index = 2
+        self.current_volume_percent = 50  # Default volume percentage (0-100% user range)
         
         # Track finger states (True = at home/neutral, False = at position)
         self.finger_states = [True] * 7  # 7 fingers, all start at home
@@ -51,12 +50,12 @@ class PicoCommandServer:
         print("Initializing hardware...")
         device.pump.go_home()
         await device.pump.wait("ReachedHome")
-        device.pump.go_to("Normal")
+        device.pump.go_to(self.current_volume_percent)  # Set to current volume percentage
         device.fingers_rig.go_home()
         await device.fingers_rig.cautionary_wait()
         device.servo_rig.go_home()
         await device.stepper.wait("Homed")
-        print("Hardware ready for commands")
+        print(f"Hardware ready - volume set to {self.current_volume_percent}%")
     
     async def _accept_connections(self):
         """Accept command connections"""
@@ -146,7 +145,7 @@ class PicoCommandServer:
             return {
                 "success": True,
                 "position": self.current_position,
-                "volume": self.volume_levels[self.current_volume_index],
+                "volume_percent": self.current_volume_percent,
                 "memory": gc.mem_free(),
                 "fingers": {
                     "states": self.finger_states,
@@ -239,23 +238,39 @@ class PicoCommandServer:
             return {"error": "Missing direction"}
         
         elif cmd_type == "set_volume":
+            # Support both direction-based and direct percentage setting
             direction = command.get("direction")  # -1=down, 1=up
-            if direction is not None:
-                new_idx = max(0, min(len(self.volume_levels) - 1,
-                                   self.current_volume_index + direction))
-                if new_idx != self.current_volume_index:
-                    self.current_volume_index = new_idx
-                    volume = self.volume_levels[self.current_volume_index]
-                    device.pump.go_to(volume)
+            volume_percent = command.get("volume_percent")  # Direct percentage setting
+            
+            if volume_percent is not None:
+                # Direct volume setting
+                if 0 <= volume_percent <= 100:
+                    self.current_volume_percent = volume_percent
+                    device.pump.go_to(volume_percent)
                     await device.pump.wait("ReachedTarget")
-                return {"success": True, "volume": self.volume_levels[self.current_volume_index]}
-            return {"error": "Missing direction"}
+                    return {"success": True, "volume_percent": self.current_volume_percent}
+                else:
+                    return {"error": "Volume must be between 0 and 100"}
+            
+            elif direction is not None:
+                # Direction-based volume change (10% increments)
+                step = 10
+                new_volume = max(0, min(100, self.current_volume_percent + (direction * step)))
+                
+                if new_volume != self.current_volume_percent:
+                    self.current_volume_percent = new_volume
+                    device.pump.go_to(new_volume)
+                    await device.pump.wait("ReachedTarget")
+                
+                return {"success": True, "volume_percent": self.current_volume_percent}
+            
+            return {"error": "Missing direction or volume_percent"}
         
         elif cmd_type == "home_all":
             print("Homing all systems with safety checks...")
             await self._init_hardware()
             self.current_position = 0
-            self.current_volume_index = 0
+            self.current_volume_percent = 0  # Set to 0% (silence)
             # Reset all finger states to home
             self.finger_states = [True] * 7
             return {"success": True, "message": "All systems homed safely"}

@@ -75,7 +75,7 @@ class StandardServo(EventfulPeripheral):
 		self._idle_position = None
 		self._start_movement("Home")
 	
-	def go_to(self, target: str | float):
+	def go_to(self, target: str | float | int):
 		if self.is_uncertain:
 			raise ValueError("Servo in uncertain state, needs homing first")
 		
@@ -85,13 +85,44 @@ class StandardServo(EventfulPeripheral):
 		
 		self._start_movement(target)
 	
-	def _start_movement(self, target: float | str):
+	def go_to_percent(self, percent: int | float):
+		"""Go to position specified as percentage (0-100%) with volume rescaling"""
+		if not 0 <= percent <= 100:
+			raise ValueError("Percentage must be between 0 and 100")
+		
+		# Apply volume rescaling: 0-100% user input maps to 30-70% servo range
+		target = self._map_volume_percentage(percent)
+		self.go_to(target)
+	
+	def _map_volume_percentage(self, user_percent: float) -> float:
+		"""
+		Map user volume percentage to actual servo position
+		- User 0% → Servo 0% (silence)
+		- User 100% → Servo 90% (practical maximum)
+		- Maps 0-100% user input to 40-90% servo range
+		"""
+		if user_percent <= 0:
+			return 0.0  # Silence
+		
+		# Map 0-100% user input to 40-90% servo range
+		# Formula: servo_percent = 40 + (user_percent * 50 / 100)
+		servo_percent = 40 + (user_percent * 50 / 100)
+		
+		# Convert to 0-1 range for servo
+		return servo_percent / 100.0
+	
+	def _start_movement(self, target: float | str | int):
 		event = "ReachedHome" if target == "Home" else "ReachedTarget"
 
 		if isinstance(target, str):
 			if target not in self._named_positions:
 				raise ValueError(f"Target position {target} not found in named positions")
 			target = self._named_positions[target]
+		elif isinstance(target, int):
+			# Handle percentage input (0-100) with volume rescaling
+			if not 0 <= target <= 100:
+				raise ValueError("Percentage must be between 0 and 100")
+			target = self._map_volume_percentage(target)
 		elif not 0 <= target <= 1:
 			raise ValueError("Target position must be between 0 and 1")
 		

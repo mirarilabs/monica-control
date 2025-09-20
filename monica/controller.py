@@ -9,15 +9,15 @@ from .planner import plan_song as plan_method
 async def home_all():
 	device.pump.go_home()
 	await device.pump.wait("ReachedHome")
-	device.pump.go_to("Silence")
+	device.pump.go_to(0)  # Set to 0% volume (silence)
 	device.fingers_rig.go_home()
 	await device.fingers_rig.cautionary_wait()
 	device.servo_rig.go_home()
 	await device.stepper.wait("Homed")
 
 async def play_song_coro():
-	device.pump.go_to(volume)
-	print("Waiting for pump to reach volume")
+	device.pump.go_to(volume_percent)
+	print(f"Setting pump to {volume_percent}% volume")
 	await device.pump.wait("ReachedTarget")
 	duties, path = plan_method()
 
@@ -55,18 +55,19 @@ def cancel_song():
 	if play_song_task:
 		play_song_task.cancel() #type: ignore
 	device.fingers_rig.go_home()
-	device.pump.go_to("Silence")
+	device.pump.go_to(0)  # Set to 0% volume (silence)
 	print("Song cancelled")
 	device.servo_rig._encoder_timer.deinit()
 	print("Hacky: ServoRig _encoder_timer deinitialized from here")
 
-async def play_song_with_plan(duties, path):
+async def play_song_with_plan(duties, path, volume_override=None):
 	"""Play a song with pre-planned duties and path"""
 	await home_all()
 	
-	# Set volume
-	device.pump.go_to(volume)
-	print("Waiting for pump to reach volume")
+	# Set volume (use override or default)
+	target_volume = volume_override if volume_override is not None else volume_percent
+	device.pump.go_to(target_volume)
+	print(f"Setting pump to {target_volume}% volume")
 	await device.pump.wait("ReachedTarget")
 
 	# Go to initial position
@@ -104,7 +105,7 @@ async def play_song_with_plan(duties, path):
 	device.servo_rig._encoder_timer.deinit()
 	print("Encoder monitoring disabled for cleanup")
 	
-	device.pump.go_to("Silence")
+	device.pump.go_to(0)  # Set to 0% volume (silence)
 	device.fingers_rig.go_home()
 	await device.fingers_rig.cautionary_wait()
 	device.stepper.set_target(0)
@@ -122,7 +123,7 @@ async def run():
 	device.servo_rig._encoder_timer.deinit()
 	print("Encoder monitoring disabled for cleanup")
 	
-	device.pump.go_to("Silence")
+	device.pump.go_to(0)  # Set to 0% volume (silence)
 	device.fingers_rig.go_home()
 	await device.fingers_rig.cautionary_wait()
 	device.stepper.set_target(0)
@@ -130,7 +131,7 @@ async def run():
 	await home_all()
 
 
-volume = config.controller["volume"]
+volume_percent = config.controller["volume_percent"]
 
 play_song_task = None
 

@@ -240,6 +240,95 @@
             color: #666;
             padding: 20px;
         }
+        .volume-control {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .volume-control label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #333;
+        }
+        .volume-slider-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+        .volume-slider {
+            width: 300px;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        .volume-slider:hover {
+            opacity: 1;
+        }
+        .volume-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #2196F3;
+            cursor: pointer;
+        }
+        .volume-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #2196F3;
+            cursor: pointer;
+            border: none;
+        }
+        #volume-display {
+            font-weight: bold;
+            color: #2196F3;
+            font-size: 18px;
+            min-width: 50px;
+        }
+        .volume-presets {
+            margin-top: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+        }
+        .volume-preset {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+            color: #495057;
+        }
+        .volume-preset:hover {
+            background: #e9ecef;
+            border-color: #2196F3;
+        }
+        .volume-preset.active {
+            background: #2196F3;
+            color: white;
+            border-color: #2196F3;
+        }
+        .volume-info {
+            margin-top: 8px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+        #servo-position {
+            color: #2196F3;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -253,7 +342,7 @@
         <div class="status-bar">
             <div>
                 <strong>Position:</strong> <span id="position">-</span> |
-                <strong>Volume:</strong> <span id="volume">-</span> |
+                <strong>Volume:</strong> <span id="volume">-</span>% |
                 <strong>Fingers:</strong> <span id="finger-status">-</span>
             </div>
             <div>
@@ -261,12 +350,26 @@
             </div>
         </div>
         
+        <div class="volume-control">
+            <label for="volume-slider">🔊 Volume Control:</label>
+            <div class="volume-slider-container">
+                <input type="range" id="volume-slider" min="0" max="100" value="50" class="volume-slider">
+                <span id="volume-display">50%</span>
+            </div>
+            <div class="volume-info">
+                <small>Servo position: <span id="servo-position">65%</span> | Optimized range: 0% → silence, 100% → maximum usable (40-90% servo)</small>
+            </div>
+            <div class="volume-presets" id="volume-presets">
+                <!-- Volume presets will be loaded here -->
+            </div>
+        </div>
+        
         <div class="controls">
             <button class="btn performance" onclick="showSongMenu()">🎵 Select & Play Song</button>
             <button class="btn" onclick="moveCart(-1)">← Left</button>
             <button class="btn" onclick="moveCart(1)">Right →</button>
-            <button class="btn" onclick="changeVolume(1)">🔊 Vol+</button>
-            <button class="btn" onclick="changeVolume(-1)">🔉 Vol-</button>
+            <button class="btn" onclick="changeVolume(1)">🔊 Vol+10%</button>
+            <button class="btn" onclick="changeVolume(-1)">🔉 Vol-10%</button>
             <button class="btn home" onclick="homeAll()">🏠 Home All</button>
         </div>
         
@@ -328,11 +431,12 @@
         
         <div class="info-panel">
             <div class="info-box">
-                <h3>Keyboard Controls</h3>
+                <h3>Controls</h3>
                 <div class="key-mapping">
                     <strong>Keys:</strong> Click keys above or use keyboard<br>
                     <strong>Movement:</strong> Arrow keys ← → (or buttons)<br>
-                    <strong>Volume:</strong> Arrow keys ↑ ↓ (or buttons)<br>
+                    <strong>Volume:</strong> Slider (0-100%) or presets<br>
+                    <strong>Fine Volume:</strong> Arrow keys ↑ ↓ (±10%)<br>
                     <strong>Home:</strong> Space bar (or button)<br>
                 </div>
             </div>
@@ -363,6 +467,8 @@
             setInterval(updateStatus, 2000); // Update every 2 seconds
             setupKeyboardEvents();
             setupMouseEvents();
+            setupVolumeSlider();
+            loadVolumePresets();
         });
 
         function setupKeyboardEvents() {
@@ -489,8 +595,17 @@
                 
                 if (data.success) {
                     document.getElementById('position').textContent = data.position;
-                    document.getElementById('volume').textContent = data.volume;
+                    document.getElementById('volume').textContent = data.volume_percent || data.volume || 0;
                     document.getElementById('memory').textContent = data.memory.toLocaleString();
+                    
+                    // Update volume slider
+                    const volumeSlider = document.getElementById('volume-slider');
+                    const volumeDisplay = document.getElementById('volume-display');
+                    const volumePercent = data.volume_percent || 0;
+                    if (volumeSlider && Math.abs(volumeSlider.value - volumePercent) > 1) {
+                        volumeSlider.value = volumePercent;
+                        volumeDisplay.textContent = volumePercent + '%';
+                    }
                     
                     // Update finger status
                     if (data.fingers) {
@@ -677,6 +792,108 @@
             }
         }
 
+        function setupVolumeSlider() {
+            const volumeSlider = document.getElementById('volume-slider');
+            const volumeDisplay = document.getElementById('volume-display');
+            const servoPosition = document.getElementById('servo-position');
+            
+            volumeSlider.addEventListener('input', function() {
+                const volume = parseInt(this.value);
+                volumeDisplay.textContent = volume + '%';
+                
+                // Calculate and display actual servo position
+                const actualServoPercent = calculateServoPosition(volume);
+                servoPosition.textContent = actualServoPercent + '%';
+                
+                updateVolumePresetSelection(volume);
+            });
+            
+            volumeSlider.addEventListener('change', function() {
+                const volume = parseInt(this.value);
+                setVolumePercent(volume);
+            });
+        }
+
+        function calculateServoPosition(userPercent) {
+            // Apply the same mapping as the Pico
+            if (userPercent <= 0) {
+                return 0;
+            }
+            // Map 0-100% user input to 40-90% servo range
+            const servoPercent = 40 + (userPercent * 50 / 100);
+            return Math.round(servoPercent);
+        }
+
+        async function loadVolumePresets() {
+            try {
+                const response = await fetch('/api/volume_presets');
+                const data = await response.json();
+                
+                if (data.success && data.presets) {
+                    displayVolumePresets(data.presets);
+                }
+            } catch (error) {
+                console.error('Failed to load volume presets:', error);
+            }
+        }
+
+        function displayVolumePresets(presets) {
+            const presetsContainer = document.getElementById('volume-presets');
+            presetsContainer.innerHTML = '';
+            
+            for (const [name, percent] of Object.entries(presets)) {
+                const presetButton = document.createElement('button');
+                presetButton.className = 'volume-preset';
+                presetButton.textContent = `${name} (${percent}%)`;
+                presetButton.onclick = () => setVolumePreset(name, percent);
+                presetButton.dataset.percent = percent;
+                presetsContainer.appendChild(presetButton);
+            }
+            
+            // Update initial selection
+            updateVolumePresetSelection(50);
+        }
+
+        function updateVolumePresetSelection(currentVolume) {
+            document.querySelectorAll('.volume-preset').forEach(preset => {
+                const presetVolume = parseInt(preset.dataset.percent);
+                if (Math.abs(presetVolume - currentVolume) <= 2) {
+                    preset.classList.add('active');
+                } else {
+                    preset.classList.remove('active');
+                }
+            });
+        }
+
+        async function setVolumePreset(name, percent) {
+            console.log(`Setting volume preset: ${name} (${percent}%)`);
+            
+            // Update slider immediately for responsive feel
+            document.getElementById('volume-slider').value = percent;
+            document.getElementById('volume-display').textContent = percent + '%';
+            updateVolumePresetSelection(percent);
+            
+            // Send to Monica
+            await setVolumePercent(percent);
+        }
+
+        async function setVolumePercent(percent) {
+            try {
+                const response = await fetch('/api/set_volume', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({volume_percent: percent})
+                });
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('volume').textContent = data.volume_percent;
+                    document.getElementById('volume-display').textContent = data.volume_percent + '%';
+                }
+            } catch (error) {
+                console.error('Volume error:', error);
+            }
+        }
+
         async function changeVolume(direction) {
             try {
                 const response = await fetch('/api/set_volume', {
@@ -686,7 +903,10 @@
                 });
                 const data = await response.json();
                 if (data.success) {
-                    document.getElementById('volume').textContent = data.volume;
+                    const volumePercent = data.volume_percent;
+                    document.getElementById('volume').textContent = volumePercent;
+                    document.getElementById('volume-slider').value = volumePercent;
+                    document.getElementById('volume-display').textContent = volumePercent + '%';
                 }
             } catch (error) {
                 console.error('Volume error:', error);
@@ -698,6 +918,9 @@
                 const response = await fetch('/api/home_all', {method: 'POST'});
                 const data = await response.json();
                 if (data.success) {
+                    // Reset volume slider to 0% after homing
+                    document.getElementById('volume-slider').value = 0;
+                    document.getElementById('volume-display').textContent = '0%';
                     updateStatus(); // Refresh status after homing
                 }
             } catch (error) {
