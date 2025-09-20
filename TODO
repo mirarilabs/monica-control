@@ -1,0 +1,98 @@
+
+ONGOING:
+Hacer lo del fast track del homing
+Durante el homing no se deberia permitir setear el target del stepper
+
+
+
+Turn controller.py into a singleton, by laying all methods raw in the file
+
+
+
+IMPORTANT:
+No deberia skiddear con teclas negras apretadas
+
+Move servo rig code to StepperServo like this:
+stepper_servo = StepperServo(config.stepper, lower_LS, upper_LS, encoder, **config.servo_rig)
+
+Para coordinar el stepper con el encoder, graficar en el tiempo ambos
+
+Para ver cuando se descordinan, guardar los puntos del espacio de fase, y graficar (en donde, a que velocidad, a que aceleracion)
+
+
+
+meter un timeout al homing del stepper
+
+
+Como hacer mas preciso el enconder: los unresolved updates quedan a la espera de estar en sanguche entre dos en la misma direccion
+(recordar que suman dos counters)
+para constatar la certeza, probar con idas y vueltas y que vuelva al cero
+despues de hacer esto, los unresolved updates serian los que no estan en sanguche
+
+
+
+Note: Stride ended up being a Duty with a nullable Chord, so maybe collapse those two.
+Maybe allow for empty chords, or make the chords nullable in duty, or create silence duties, whatever.
+Also move the definition of NullableChord from chord.py
+
+Split Keyboard into utils.music.Keyboard and KeyboardWagon(Keyboard)
+Maybe even merge into Keystra
+
+ver si usar dunders para hacer metodos privados
+
+armar bien modulos (device por ejemplo)
+
+Simplify ik flight time estimation
+make proper use of flight_time in choice_quality, and reevaluate all scoring
+tal vez deberia haber un feasibility radius calculado a partir de la duracion del stride por IK, y que el score sea 0 o inf
+
+armar otro IK de segmentos de accel distintos pero que hereden del mismo y tengan los mismos metodos de trayectoria y flighttime, etc
+
+Agregar puntos/2 una octaba mas abajo
+
+
+ver de usar '__enter__' and '__exit__' para el buzzer y otros perifericos
+
+The button _debounced_handler can miss events! maybe do polling? Maybe this:
+https://forum.micropython.org/viewtopic.php?t=1938
+Maybe events should have cooldowns indepent of each other
+
+en peripheral crear una funcion para setear pines generica?:
+self._pin = Pin(pin, Pin.IN, Pin.PULL_UP)
+
+para los eventful peripherals, el registro de eventos tal vez se deberia hacer mas lightweight,
+con un array en vez de diccionario y keys que sean enums, o pensar en algo
+
+Track the events issue:
+https://github.com/micropython/micropython/pull/15302#issuecomment-2545730794
+
+
+en vez de reset, deberian llamarse kill
+
+create a stepper_agent.py that copies from simple_agent.py and makes the final ramp more pronounced and break the initial ramp in segments of different acceleration
+
+The trajectory should take into account the movement while computing the trajectory, and add a cautionary initial linear movement
+
+Implement a ramp and durations for the servos, or maybe even following Trajectories for animation curves
+
+
+Explain standard_servo.py better
+
+
+
+Fix inconsistent naming between _task and _coro variables and methods
+I propose coro is the method to be called, while task is the "instantiated" coroutine that is output from create_task
+
+
+
+
+
+
+
+just keep an eye on this:
+at one point i wrote these lines in the controller:
+	device.servo_rig._encoder_timer.deinit()
+	print("Hacky: ServoRig _encoder_timer deinitialized from here")
+This was because the stepper reset deinitialized the stepper timer sync, but not the encoder timer
+eventually, as a new version of the stepper is writen, the reset should deinit both and the problems be over
+

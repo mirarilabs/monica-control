@@ -1,0 +1,29 @@
+
+TODO: Clean up explanation after I decide what to do
+
+UPDATE: Another issue was found: once a task awaits on an event, the sleeps seem to not be triggered until the event
+is set again, it becomes hooked on the event, idk. But when it wakes from some sleep it unlocks forever again.
+Using method 2 because it's more stable, and the alternative would involve creating watchdogs anyways
+
+
+Original explanation:
+This class was create to circumvent issue: https://github.com/micropython/micropython/pull/15302#issuecomment-2545730794
+Apparently the current version of micropython interpreter ported for the PiPico (version , which I'm using as of 2024/12/16)
+has these issues:
+- Top-level waits for Events cannot keep the program alive by themselves, something else needs to be queued apparently
+- Event sets don't trigger an instant response. They seem to be queued, but something else needs to wake the uasyncio scheduler
+The two possible solutions are:
+
+Method 1 (preferred): run a keep_alive() task with very long sleeps, then run a dummy task with uasyncio every time to wake up
+the scheduler for instant broadcast. Pros: it works, and eveything that waited for the event runs before the broadcast method
+returns. Cons: using uasyncio.run() generates overhead, but mostly it's supposed to be bad. In practice, it does show
+instability, and the program randomly terminates if keep_alive has very short sleeps (maybe it can't wake up again given some
+race condition?). It sounds very unlikely to be an issue if the sleeps are very long.
+
+Method 2: only run a keep_awake() task with very short sleeps. Pros: It ensures system stability. Cons: The broadcast latencies
+are tied to the update interval and are kind of random. It generate more overhead the shorter the lantencies need to be.
+Tasks waiting on the event will run much later than the broadcast, so there's less control.
+
+
+
+
