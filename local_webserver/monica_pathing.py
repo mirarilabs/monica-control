@@ -109,6 +109,27 @@ class Wagon:
             qualities.append(max(0.1, base_quality))
         
         return qualities
+    
+    def calculate_fingerings(self, chord: Optional[Chord], position: int) -> List[Optional[int]]:
+        """Calculate optimal fingerings for a chord at a given position (simplified)"""
+        if not chord or not chord.notes:
+            return [None] * 7  # 7 fingers, all at home
+        
+        # Simplified fingering calculation
+        # In reality, this would be much more complex
+        fingerings = [None] * 7
+        
+        # For now, just assign fingers based on chord notes
+        for i, note in enumerate(chord.notes[:7]):  # Max 7 fingers
+            if i < 7:
+                fingerings[i] = 0  # Left position for all fingers
+        
+        return fingerings
+    
+    def calculate_steps(self, position: int) -> float:
+        """Calculate stepper steps for a given position (simplified)"""
+        # Simplified calculation - in reality this would use wagon_2_stepper ratio
+        return position * 100.0  # 100 steps per position
 
 
 class Choice:

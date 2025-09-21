@@ -567,7 +567,6 @@
                 <div class="key" data-finger="5" data-position="1">T</div>
                 <div class="key" data-finger="6" data-position="0">Y</div>
                 <div class="key" data-finger="6" data-position="1">U</div>
-                <div class="key" data-finger="6" data-position="1">I</div>
             </div>
             <div class="key-row">
                 <div class="key" data-finger="0" data-position="0">A</div>
@@ -590,12 +589,13 @@
                     <strong>Volume:</strong> Slider (0-100%) or presets<br>
                     <strong>Fine Volume:</strong> Arrow keys ↑ ↓ (±10%)<br>
                     <strong>Home:</strong> Space bar (or button)<br>
+                    <strong>Local Duty:</strong> <label><input type="checkbox" id="local-duty-toggle" checked> Use local calculation</label><br>
                 </div>
             </div>
             <div class="info-box">
                 <h3>Key Mapping</h3>
                 <div class="key-mapping">
-                    <strong>Upper Row:</strong> W E R T Y U I<br>
+                    <strong>Upper Row:</strong> W E R T Y U<br>
                     <strong>Lower Row:</strong> A S D F G H J K<br>
                     Each key controls a specific finger position<br>
                     Left position = blow, Right position = draw
@@ -645,6 +645,7 @@
                     changeVolume(-1);
                 } else if (isValidKey(key) && !activeKeys.has(key)) {
                     activeKeys.add(key);
+                    console.log('Keyboard key pressed:', key);
                     keyDownByLetter(key);  // Hold key down
                     updateKeyDisplay(key, true);
                 }
@@ -654,6 +655,7 @@
                 const key = e.key.toLowerCase();
                 if (activeKeys.has(key)) {
                     activeKeys.delete(key);
+                    console.log('Keyboard key released:', key);
                     keyUpByLetter(key);  // Release key
                     updateKeyDisplay(key, false);
                 }
@@ -666,26 +668,32 @@
                     e.preventDefault();
                     const finger = parseInt(this.dataset.finger);
                     const position = parseInt(this.dataset.position);
-                    keyDown(finger, position);  // Hold key down
+                    // Get the key letter from the element's text content
+                    const keyLetter = this.textContent.toLowerCase();
+                    keyDown(finger, position, keyLetter);  // Hold key down
                     this.classList.add('active');
                 });
 
                 keyElement.addEventListener('mouseup', function(e) {
                     const finger = parseInt(this.dataset.finger);
-                    keyUp(finger);  // Release key
+                    // Get the key letter from the element's text content
+                    const keyLetter = this.textContent.toLowerCase();
+                    keyUp(finger, keyLetter);  // Release key
                     this.classList.remove('active');
                 });
 
                 keyElement.addEventListener('mouseleave', function(e) {
                     const finger = parseInt(this.dataset.finger);
-                    keyUp(finger);  // Release key when mouse leaves
+                    // Get the key letter from the element's text content
+                    const keyLetter = this.textContent.toLowerCase();
+                    keyUp(finger, keyLetter);  // Release key when mouse leaves
                     this.classList.remove('active');
                 });
             });
         }
 
         function isValidKey(key) {
-            return 'asdfjkghwertyui'.includes(key);
+            return 'asdfjkghwertyu'.includes(key);
         }
 
         function keyDownByLetter(key) {
@@ -693,12 +701,12 @@
                 'a': [0, 0], 's': [0, 1], 'd': [1, 0], 'f': [1, 1],
                 'g': [2, 0], 'h': [2, 1], 'j': [3, 0], 'k': [3, 1],
                 'w': [4, 0], 'e': [4, 1], 'r': [5, 0], 't': [5, 1],
-                'y': [6, 0], 'u': [6, 1], 'i': [6, 1]
+                'y': [6, 0], 'u': [6, 1]
             };
             
             if (keyMapping[key]) {
                 const [finger, position] = keyMapping[key];
-                keyDown(finger, position);
+                keyDown(finger, position, key);
             }
         }
 
@@ -707,12 +715,12 @@
                 'a': [0, 0], 's': [0, 1], 'd': [1, 0], 'f': [1, 1],
                 'g': [2, 0], 'h': [2, 1], 'j': [3, 0], 'k': [3, 1],
                 'w': [4, 0], 'e': [4, 1], 'r': [5, 0], 't': [5, 1],
-                'y': [6, 0], 'u': [6, 1], 'i': [6, 1]
+                'y': [6, 0], 'u': [6, 1]
             };
             
             if (keyMapping[key]) {
                 const [finger, position] = keyMapping[key];
-                keyUp(finger);
+                keyUp(finger, key);
             }
         }
 
@@ -721,7 +729,7 @@
                 'a': [0, 0], 's': [0, 1], 'd': [1, 0], 'f': [1, 1],
                 'g': [2, 0], 'h': [2, 1], 'j': [3, 0], 'k': [3, 1],
                 'w': [4, 0], 'e': [4, 1], 'r': [5, 0], 't': [5, 1],
-                'y': [6, 0], 'u': [6, 1], 'i': [6, 1]
+                'y': [6, 0], 'u': [6, 1]
             };
             
             if (keyMapping[key]) {
@@ -903,23 +911,63 @@
             await startSelectedPerformance();
         }
 
-        async function keyDown(finger, position) {
+        async function keyDown(finger, position, key = null) {
             // Fire and forget for maximum speed - sustain note
+            const body = {finger: finger, position: position};
+            
+            // Check if local duty calculation is enabled
+            const useLocal = document.getElementById('local-duty-toggle').checked;
+            if (useLocal && key) {
+                body.local_duty = true;
+                body.key = key;
+                console.log('Using local duty calculation for key:', key);
+            } else {
+                console.log('Using network control for key:', key || 'unknown');
+            }
+            
             fetch('/api/key_down', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({finger: finger, position: position})
+                body: JSON.stringify(body)
+            }).then(response => response.json())
+            .then(data => {
+                if (data.method === 'local' && data.duty) {
+                    handleLocalDutyResponse(data.duty);
+                }
+                if (data.pico_response) {
+                    console.log('Pico response:', data.pico_response);
+                }
             }).catch(error => {
                 console.error('Key down error:', error);
             });
         }
 
-        async function keyUp(finger) {
+        async function keyUp(finger, key = null) {
             // Fire and forget for maximum speed - release note
+            const body = {finger: finger};
+            
+            // Check if local duty calculation is enabled
+            const useLocal = document.getElementById('local-duty-toggle').checked;
+            if (useLocal && key) {
+                body.local_duty = true;
+                body.key = key;
+                console.log('Using local duty calculation for key up:', key);
+            } else {
+                console.log('Using network control for key up:', key || 'unknown');
+            }
+            
             fetch('/api/key_up', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({finger: finger})
+                body: JSON.stringify(body)
+            }).then(response => response.json())
+            .then(data => {
+                if (data.method === 'local' && data.duty) {
+                    handleLocalDutyResponse(data.duty);
+                }
+                if (data.pico_response) {
+                    console.log('Pico response:', data.pico_response);
+                }
             }).catch(error => {
                 console.error('Key up error:', error);
             });
@@ -1060,16 +1108,55 @@
 
         async function homeAll() {
             try {
-                const response = await fetch('/api/home_all', {method: 'POST'});
+                const body = {};
+                
+                // Check if local duty calculation is enabled
+                const useLocal = document.getElementById('local-duty-toggle').checked;
+                if (useLocal) {
+                    body.local_duty = true;
+                }
+                
+                const response = await fetch('/api/home_all', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(body)
+                });
                 const data = await response.json();
+                
                 if (data.success) {
                     // Reset volume slider to 0% after homing
                     document.getElementById('volume-slider').value = 0;
                     document.getElementById('volume-display').textContent = '0%';
                     updateStatus(); // Refresh status after homing
+                    
+                    if (data.method === 'local') {
+                        console.log('Local home all completed');
+                    }
                 }
             } catch (error) {
                 console.error('Home error:', error);
+            }
+        }
+
+        function handleLocalDutyResponse(duty) {
+            // Handle local duty calculation response
+            console.log('Local duty response:', duty);
+            
+            if (duty.type === 'chord') {
+                console.log(`Chord: ${duty.chord}, Position: ${duty.cart_position}`);
+                
+                // Handle cart movement if needed
+                if (duty.cart_movement) {
+                    console.log(`Cart movement: ${duty.cart_movement.from} -> ${duty.cart_movement.to}`);
+                    // Could update UI to show cart position
+                }
+                
+                // Show active fingers
+                if (duty.active_fingers && duty.active_fingers.length > 0) {
+                    console.log('Active fingers:', duty.active_fingers.map(f => `Finger ${f.finger} (${f.key})`).join(', '));
+                }
+            } else if (duty.type === 'silence') {
+                console.log('Silence - all fingers home');
             }
         }
 

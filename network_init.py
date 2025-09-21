@@ -2,6 +2,12 @@ import network
 import uasyncio
 import network_credentials
 
+# Static IP configuration
+STATIC_IP = '192.168.1.120'
+SUBNET_MASK = '255.255.255.0'
+GATEWAY = '192.168.1.1'
+DNS_SERVER = '8.8.8.8'
+
 class NetworkManager:
     def __init__(self):
         self.wlan = None
@@ -12,6 +18,10 @@ class NetworkManager:
         """Connect to WiFi network using credentials from network_credentials.py"""
         self.wlan = network.WLAN(network.STA_IF)
         self.wlan.active(True)
+        
+        # Configure static IP address
+        print(f"Configuring static IP address: {STATIC_IP}")
+        self.wlan.ifconfig((STATIC_IP, SUBNET_MASK, GATEWAY, DNS_SERVER))
         
         print(f"Connecting to WiFi: {network_credentials.WIFI_SSID}")
         self.wlan.connect(network_credentials.WIFI_SSID, network_credentials.WIFI_PASSWORD)
@@ -27,7 +37,7 @@ class NetworkManager:
             self.connected = True
             self.ip_address = self.wlan.ifconfig()[0]
             print(f"\nWiFi connected successfully!")
-            print(f"IP Address: {self.ip_address}")
+            print(f"Static IP Address: {self.ip_address}")
             print(f"Network config: {self.wlan.ifconfig()}")
             return True
         else:

@@ -13,6 +13,7 @@ import os
 from werkzeug.utils import secure_filename
 from monica_pathing import song_planner
 from midi_processor import midi_processor
+from local_duty_calculator import local_duty_calculator
 
 app = Flask(__name__)
 
@@ -23,7 +24,7 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Pico configuration
-PICO_IP = "192.168.1.100"  # Replace with your Pico's IP
+PICO_IP = "192.168.1.120"  # Fixed Pico IP address
 PICO_PORT = 8080
 
 class PicoClient:
@@ -161,12 +162,37 @@ def key_down():
     data = request.get_json()
     finger = data.get('finger')
     position = data.get('position')
+    key = data.get('key')  # Optional: key letter for local calculation
     
+    # Check if local duty calculation is enabled
+    use_local = data.get('local_duty', False)
+    
+    if use_local and key:
+        # Use local duty calculation
+        try:
+            response = local_duty_calculator.key_down(key)
+            response['method'] = 'local'
+            
+            # Also send the actual command to Pico for physical movement
+            pico_response = pico_client.send_command({
+                "type": "key_down",
+                "finger": finger,
+                "position": position
+            })
+            response['pico_response'] = pico_response
+            
+            return jsonify(response)
+        except Exception as e:
+            print(f"Local duty calculation failed: {e}")
+            # Fall back to network control
+    
+    # Network control (original method)
     response = pico_client.send_command({
         "type": "key_down",
         "finger": finger,
         "position": position
     })
+    response['method'] = 'network'
     return jsonify(response)
 
 @app.route('/api/key_up', methods=['POST'])
@@ -174,11 +200,35 @@ def key_up():
     """Key released"""
     data = request.get_json()
     finger = data.get('finger')
+    key = data.get('key')  # Optional: key letter for local calculation
     
+    # Check if local duty calculation is enabled
+    use_local = data.get('local_duty', False)
+    
+    if use_local and key:
+        # Use local duty calculation
+        try:
+            response = local_duty_calculator.key_up(key)
+            response['method'] = 'local'
+            
+            # Also send the actual command to Pico for physical movement
+            pico_response = pico_client.send_command({
+                "type": "key_up",
+                "finger": finger
+            })
+            response['pico_response'] = pico_response
+            
+            return jsonify(response)
+        except Exception as e:
+            print(f"Local duty calculation failed: {e}")
+            # Fall back to network control
+    
+    # Network control (original method)
     response = pico_client.send_command({
         "type": "key_up",
         "finger": finger
     })
+    response['method'] = 'network'
     return jsonify(response)
 
 @app.route('/api/press_key', methods=['POST'])
@@ -247,8 +297,48 @@ def volume_presets():
 @app.route('/api/home_all', methods=['POST'])
 def home_all():
     """Home all systems"""
+    data = request.get_json() or {}
+    use_local = data.get('local_duty', False)
+    
+    if use_local:
+        # Reset local duty calculator
+        try:
+            response = local_duty_calculator.home_all()
+            response['method'] = 'local'
+            return jsonify(response)
+        except Exception as e:
+            print(f"Local duty calculation failed: {e}")
+            # Fall back to network control
+    
+    # Network control (original method)
     response = pico_client.send_command({"type": "home_all"})
+    response['method'] = 'network'
     return jsonify(response)
+
+@app.route('/api/local_duty_status', methods=['GET'])
+def local_duty_status():
+    """Get status of local duty calculator"""
+    try:
+        status = local_duty_calculator.get_status()
+        return jsonify({"success": True, "status": status})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/api/set_cart_position', methods=['POST'])
+def set_cart_position():
+    """Set cart position (for local duty calculation)"""
+    data = request.get_json()
+    position = data.get('position')
+    
+    if position is None:
+        return jsonify({"error": "Missing position"})
+    
+    try:
+        response = local_duty_calculator.set_cart_position(position)
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
 
 @app.route('/config')
 def config():
