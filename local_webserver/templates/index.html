@@ -354,6 +354,112 @@
             margin-top: 8px;
             color: #666;
         }
+        .midi-upload-section {
+            margin-top: 15px;
+        }
+        .file-upload-area {
+            margin-bottom: 20px;
+        }
+        .upload-dropzone {
+            border: 2px dashed #2196F3;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #f8f9fa;
+        }
+        .upload-dropzone:hover {
+            border-color: #1976D2;
+            background: #e3f2fd;
+        }
+        .upload-dropzone.dragover {
+            border-color: #4CAF50;
+            background: #e8f5e8;
+        }
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .upload-text {
+            color: #333;
+        }
+        .uploaded-files-list {
+            margin-top: 20px;
+        }
+        .file-item {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .file-info {
+            flex: 1;
+        }
+        .file-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .file-details {
+            font-size: 12px;
+            color: #666;
+        }
+        .file-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .file-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+        .file-btn.process {
+            background: #2196F3;
+            color: white;
+        }
+        .file-btn.process:hover {
+            background: #1976D2;
+        }
+        .file-btn.play {
+            background: #4CAF50;
+            color: white;
+        }
+        .file-btn.play:hover {
+            background: #45a049;
+        }
+        .file-btn.delete {
+            background: #f44336;
+            color: white;
+        }
+        .file-btn.delete:hover {
+            background: #d32f2f;
+        }
+        .file-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .processing-indicator {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #2196F3;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -429,15 +535,21 @@
                     </div>
                     
                     <div class="song-section">
-                        <h3>📁 Upload Custom Song</h3>
-                        <div class="upload-placeholder">
-                            <p>🚧 Upload functionality coming soon!</p>
-                            <p>Future features:</p>
-                            <ul>
-                                <li>Upload custom MIDI files</li>
-                                <li>Create songs with web composer</li>
-                                <li>Import from music notation</li>
-                            </ul>
+                        <h3>🎼 Upload MIDI File</h3>
+                        <div class="midi-upload-section">
+                            <div class="file-upload-area" id="file-upload-area">
+                                <input type="file" id="midi-file-input" accept=".mid,.midi" style="display: none;">
+                                <div class="upload-dropzone" onclick="document.getElementById('midi-file-input').click()">
+                                    <div class="upload-icon">📁</div>
+                                    <div class="upload-text">
+                                        <strong>Click to select MIDI file</strong><br>
+                                        <small>or drag & drop .mid/.midi files here</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="uploaded-files" class="uploaded-files-list">
+                                <!-- Uploaded files will be listed here -->
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -509,6 +621,7 @@
             setupMouseEvents();
             setupVolumeSlider();
             loadVolumePresets();
+            setupMidiUpload();
         });
 
         function setupKeyboardEvents() {
@@ -957,6 +1070,199 @@
                 }
             } catch (error) {
                 console.error('Home error:', error);
+            }
+        }
+
+        // MIDI Upload Functions
+        function setupMidiUpload() {
+            const fileInput = document.getElementById('midi-file-input');
+            const dropzone = document.querySelector('.upload-dropzone');
+            
+            // File input change handler
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // Drag and drop handlers
+            dropzone.addEventListener('dragover', handleDragOver);
+            dropzone.addEventListener('dragleave', handleDragLeave);
+            dropzone.addEventListener('drop', handleFileDrop);
+            
+            // Load existing files when modal opens
+            loadUploadedFiles();
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('dragover');
+        }
+
+        function handleFileDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFiles(files);
+            }
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            handleFiles(files);
+        }
+
+        async function handleFiles(files) {
+            for (const file of files) {
+                if (file.type === 'audio/midi' || file.name.toLowerCase().endsWith('.mid') || file.name.toLowerCase().endsWith('.midi')) {
+                    await uploadMidiFile(file);
+                } else {
+                    alert(`Invalid file type: ${file.name}. Please upload .mid or .midi files.`);
+                }
+            }
+        }
+
+        async function uploadMidiFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('/api/upload_midi', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    console.log('File uploaded:', data);
+                    loadUploadedFiles(); // Refresh the file list
+                } else {
+                    alert('Upload failed: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('Upload failed: ' + error.message);
+            }
+        }
+
+        async function loadUploadedFiles() {
+            try {
+                const response = await fetch('/api/list_midi_files');
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayUploadedFiles(data.files);
+                } else {
+                    console.error('Failed to load files:', data.error);
+                }
+            } catch (error) {
+                console.error('Error loading files:', error);
+            }
+        }
+
+        function displayUploadedFiles(files) {
+            const container = document.getElementById('uploaded-files');
+            
+            if (files.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">No MIDI files uploaded yet</div>';
+                return;
+            }
+            
+            container.innerHTML = files.map(file => `
+                <div class="file-item">
+                    <div class="file-info">
+                        <div class="file-name">${file.filename}</div>
+                        <div class="file-details">
+                            Size: ${formatFileSize(file.size)} | 
+                            ${file.processed ? '✅ Processed' : '⏳ Not processed'}
+                            ${file.metadata ? ` | Duration: ${(file.metadata.duration_ms/1000).toFixed(1)}s` : ''}
+                        </div>
+                    </div>
+                    <div class="file-actions">
+                        ${!file.processed ? 
+                            `<button class="file-btn process" onclick="processMidiFile('${file.filename}')">Process</button>` :
+                            `<button class="file-btn play" onclick="playMidiFile('${file.filename}')">Play</button>`
+                        }
+                        <button class="file-btn delete" onclick="deleteMidiFile('${file.filename}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        async function processMidiFile(filename) {
+            try {
+                const response = await fetch('/api/process_midi', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({filename: filename})
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert(`MIDI file processed successfully!\n\nDuties: ${data.duty_count}\nDuration: ${(data.metadata.duration_ms/1000).toFixed(1)}s\nNotes in range: ${data.metadata.filtered_notes}/${data.metadata.original_notes}`);
+                    loadUploadedFiles(); // Refresh the file list
+                } else {
+                    alert('Processing failed: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Processing error:', error);
+                alert('Processing failed: ' + error.message);
+            }
+        }
+
+        async function playMidiFile(filename) {
+            try {
+                closeSongMenu(); // Close the modal first
+                
+                const response = await fetch('/api/play_midi', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({filename: filename})
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert(`MIDI performance "${filename}" started!`);
+                } else {
+                    alert('Playback failed: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Playback error:', error);
+                alert('Playback failed: ' + error.message);
+            }
+        }
+
+        async function deleteMidiFile(filename) {
+            if (!confirm(`Are you sure you want to delete "${filename}"?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/delete_midi', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({filename: filename})
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    loadUploadedFiles(); // Refresh the file list
+                } else {
+                    alert('Delete failed: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert('Delete failed: ' + error.message);
             }
         }
     </script>

@@ -9,9 +9,18 @@ import socket
 import json
 import threading
 import time
+import os
+from werkzeug.utils import secure_filename
 from monica_pathing import song_planner
+from midi_processor import midi_processor
 
 app = Flask(__name__)
+
+# MIDI upload configuration
+UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'mid', 'midi'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Pico configuration
 PICO_IP = "192.168.1.100"  # Replace with your Pico's IP
@@ -83,6 +92,14 @@ class PicoClient:
         return {"error": f"Connection failed after {retries} attempts: {last_error}"}
 
 pico_client = PicoClient(PICO_IP, PICO_PORT)
+
+# MIDI processing state
+processed_midi_data = {}  # Store processed MIDI data in memory
+
+def allowed_file(filename):
+    """Check if file has allowed extension"""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @app.route('/')
 def index():
@@ -237,6 +254,154 @@ def home_all():
 def config():
     """Configuration page"""
     return render_template('config.html', pico_ip=PICO_IP, pico_port=PICO_PORT)
+
+@app.route('/api/upload_midi', methods=['POST'])
+def upload_midi():
+    """Upload and process MIDI file"""
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+    
+    if file and allowed_file(file.filename):
+        try:
+            # Secure the filename
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            
+            # Save uploaded file
+            file.save(filepath)
+            
+            # Get MIDI file information
+            info = midi_processor.get_midi_info(filepath)
+            
+            return jsonify({
+                "success": True,
+                "message": f"MIDI file '{filename}' uploaded successfully",
+                "filename": filename,
+                "info": info
+            })
+            
+        except Exception as e:
+            # Clean up file on error
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            return jsonify({"error": f"Error processing MIDI file: {str(e)}"}), 500
+    
+    return jsonify({"error": "Invalid file type. Please upload .mid or .midi files"}), 400
+
+@app.route('/api/process_midi', methods=['POST'])
+def process_midi():
+    """Process uploaded MIDI file to duties and path"""
+    data = request.get_json()
+    filename = data.get('filename')
+    
+    if not filename:
+        return jsonify({"error": "No filename provided"}), 400
+    
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(filename))
+    
+    if not os.path.exists(filepath):
+        return jsonify({"error": "File not found"}), 404
+    
+    try:
+        # Process MIDI file
+        duties_dict, path, metadata = midi_processor.process_midi_file(filepath)
+        
+        # Store processed data in memory
+        processed_midi_data[filename] = {
+            'duties': duties_dict,
+            'path': path,
+            'metadata': metadata
+        }
+        
+        return jsonify({
+            "success": True,
+            "message": f"MIDI file processed successfully",
+            "metadata": metadata,
+            "duty_count": len(duties_dict),
+            "path_length": len(path)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Error processing MIDI file: {str(e)}"}), 500
+
+@app.route('/api/play_midi', methods=['POST'])
+def play_midi():
+    """Play processed MIDI file as Monica performance"""
+    data = request.get_json()
+    filename = data.get('filename')
+    
+    if not filename:
+        return jsonify({"error": "No filename provided"}), 400
+    
+    if filename not in processed_midi_data:
+        return jsonify({"error": "MIDI file not processed. Please process it first."}), 400
+    
+    try:
+        midi_data = processed_midi_data[filename]
+        
+        # Send MIDI performance to Pico using existing command type
+        response = pico_client.send_command({
+            "type": "play_performance_with_pathing",
+            "song": f"midi_{filename}",  # Use filename as song identifier
+            "duties": midi_data['duties'],
+            "path": midi_data['path']
+        })
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        return jsonify({"error": f"Error playing MIDI file: {str(e)}"}), 500
+
+@app.route('/api/list_midi_files')
+def list_midi_files():
+    """List uploaded MIDI files"""
+    try:
+        files = []
+        for filename in os.listdir(app.config['UPLOAD_FOLDER']):
+            if allowed_file(filename):
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file_size = os.path.getsize(filepath)
+                is_processed = filename in processed_midi_data
+                
+                files.append({
+                    'filename': filename,
+                    'size': file_size,
+                    'processed': is_processed,
+                    'metadata': processed_midi_data[filename]['metadata'] if is_processed else None
+                })
+        
+        return jsonify({"success": True, "files": files})
+        
+    except Exception as e:
+        return jsonify({"error": f"Error listing files: {str(e)}"}), 500
+
+@app.route('/api/delete_midi', methods=['POST'])
+def delete_midi():
+    """Delete uploaded MIDI file"""
+    data = request.get_json()
+    filename = data.get('filename')
+    
+    if not filename:
+        return jsonify({"error": "No filename provided"}), 400
+    
+    try:
+        # Remove from memory
+        if filename in processed_midi_data:
+            del processed_midi_data[filename]
+        
+        # Remove file
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(filename))
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        
+        return jsonify({"success": True, "message": f"File '{filename}' deleted successfully"})
+        
+    except Exception as e:
+        return jsonify({"error": f"Error deleting file: {str(e)}"}), 500
 
 @app.route('/api/set_pico_address', methods=['POST'])
 def set_pico_address():
